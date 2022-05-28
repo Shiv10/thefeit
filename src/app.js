@@ -1,4 +1,5 @@
 require("dotenv").config();
+require('./models/dbinit');
 const express = require("express");
 const rateLimiter = require('express-rate-limit');
 const bodyParser = require('body-parser')
