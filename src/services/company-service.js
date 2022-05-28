@@ -69,7 +69,29 @@ router.post('/sendOtp', async (req, res) => {
 
 router.post('/signup', async (req, res) => {
     try {
-        const {phone, companyName, typeOfBusiness, employeeName, address, otp} = req.body; 
+        const {phone, companyName, typeOfBusiness, employeeName, address, otp} = req.body;
+        const sessionOtp = sessionstorage.getItem(phone);
+        if (otp!=sessionOtp) {
+            return res.send(401).json({sucess: false, message: 'Invalid OTP'});
+        }
+
+        const employeeInstance = await company.findOne({ phone });
+        if (employeeInstance) {
+            return res.status(403).json({success: false, message: 'Same number exists in DB'});
+        }
+
+        let newOrg = new company({
+            phone,
+            companyName,
+            typeOfBusiness,
+            employeeName,
+            address
+        });
+
+        newOrg = await newOrg.save();
+        //add contract call
+        return res.status(200).json({success: true, message: 'Org Created'});
+
     } catch (e) {
         return res.status(500).json({success: false, message: 'Some error occurred'});
     }
