@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const comapany = mongoose.model('company', new mongoose.Schema({
     email: {
         type: String,
-        required: true,
+        // required: true,
         unique: true,
     },
     phone: {
