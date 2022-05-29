@@ -5,6 +5,25 @@ const sessionstorage = require('sessionstorage');
 const user = require('../models/user');
 const hashPassword = require('../tools/hash');
 const jwt = require('jsonwebtoken');
+const {
+	AccountId,
+	PrivateKey,
+	Client,
+	FileCreateTransaction,
+	ContractCreateTransaction,
+	ContractFunctionParameters,
+	ContractExecuteTransaction,
+	ContractCallQuery,
+	Hbar,
+} = require("@hashgraph/sdk");
+const authorize = require('../middlewares/auth');
+
+// Configure accounts and client
+const operatorId = AccountId.fromString(process.env.ACCOUNT_ID);
+const operatorKey = PrivateKey.fromString(process.env.PRIVATE_KEY);
+
+const hederaClient = Client.forTestnet().setOperator(operatorId, operatorKey);
+const contractId = '0.0.34934008'
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID
 const authToken = process.env.TWILIO_ACCOUNT_AUTHKEY
@@ -65,7 +84,7 @@ router.post('/sendOtp', async (req, res) => {
         return res.send(200).json({success: true, message: 'OTP sent'});
 
     } catch (e) {
-        return res.status(500).json({success: false, message: 'Some error occurred'});
+        return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
 
@@ -94,11 +113,11 @@ router.post('/signup', async (req, res) => {
         return res.status(200).json({success: true, message: 'User Created'});
 
     } catch (e) {
-        return res.status(500).json({success: false, message: 'Some error occurred'});
+        return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
     try {
         const {phone, password} = req.body;
         const user = await user.findOne({phone});
@@ -118,7 +137,41 @@ router.post('/login', (req, res) => {
     
         return res.status(401).json({ success: false, error: "Invalid credentials" });
     } catch (e) {
-        return res.status(500).json({success: false, message: 'Some error occurred'});
+        return res.status(500).json({success: false, message: 'Internal server error '});
+    }
+});
+
+router.post('/registerProduct', authorize, async (req, res) => {
+    try {
+
+        const {serialNumber, phone} = req.body;
+        phone = parseInt(phone);
+        serialNumber = parseInt(serialNumber);
+    
+        const contractQueryTx = new ContractCallQuery()
+            .setContractId(contractId)
+            .setGas(100000)
+            .setFunction("getProduct", new ContractFunctionParameters().addUint256(serialNumber));
+        const contractQuerySubmit = await contractQueryTx.execute(client);
+        const contractQueryResult = contractQuerySubmit.getUint256(0);
+        
+        if(contractQueryResult.toString().length==10) {
+            return res.status(403).json({success: false, message: 'Product already registered.'});
+        }
+    
+        const contractExecuteTx = new ContractExecuteTransaction()
+            .setContractId(contractId)
+            .setGas(100000)
+            .setFunction("setProduct", new ContractFunctionParameters().addUint256(serialNumber).addUint256(phone));
+    
+        const contractExecuteSubmit = await contractExecuteTx.execute(client);
+        const contractExecuteRx = await contractExecuteSubmit.getReceipt(client);
+        if(contractExecuteRx.status =='SUCCESS') {
+            return res.status(200).json({success: true, message: 'Product registered successfully.'})
+        }
+        return res.status(500).json({success: false, message: 'Internal server error '});
+    } catch (e) {
+        return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
 
