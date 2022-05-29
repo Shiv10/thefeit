@@ -65,7 +65,7 @@ router.post('/sendOtp', async (req, res) => {
         return res.send(200).json({success: true, message: 'OTP sent'});
 
     } catch (e) {
-        return res.status(500).json({success: false, message: 'Some error occurred'});
+        return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
 
@@ -94,11 +94,11 @@ router.post('/signup', async (req, res) => {
         return res.status(200).json({success: true, message: 'User Created'});
 
     } catch (e) {
-        return res.status(500).json({success: false, message: 'Some error occurred'});
+        return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
     try {
         const {phone, password} = req.body;
         const user = await user.findOne({phone});
@@ -118,7 +118,7 @@ router.post('/login', (req, res) => {
     
         return res.status(401).json({ success: false, error: "Invalid credentials" });
     } catch (e) {
-        return res.status(500).json({success: false, message: 'Some error occurred'});
+        return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
 
