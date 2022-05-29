@@ -124,3 +124,5 @@ router.post('/login', (req, res) => {
         return res.status(500).json({success: false, message: 'Some error occurred'});
     }
 });
+
+module.exports = router;

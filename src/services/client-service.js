@@ -97,3 +97,29 @@ router.post('/signup', async (req, res) => {
         return res.status(500).json({success: false, message: 'Some error occurred'});
     }
 });
+
+router.post('/login', (req, res) => {
+    try {
+        const {phone, password} = req.body;
+        const user = await user.findOne({phone});
+        if (!user) {
+            return res.status(401).json({ success: false, error: "Invalid credentials" });
+        }
+    
+        let check = await bcrypt.compare(password, user.password);
+        if (check) {
+            const secret = process.env.JWT_SECRET;
+            let id = user._id;
+            const token = jwt.sign({id: id}, secret, {
+                expiresIn: "30d"
+            });
+            return res.status(200).json({ success: true, token: token });
+        }
+    
+        return res.status(401).json({ success: false, error: "Invalid credentials" });
+    } catch (e) {
+        return res.status(500).json({success: false, message: 'Some error occurred'});
+    }
+});
+
+module.exports = router;
