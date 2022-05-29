@@ -22,9 +22,13 @@ const comapany = mongoose.model('company', new mongoose.Schema({
         type: String,
         required: true
     },
-    address: {
+    password: {
         type: String,
         required: true
+    },
+    products: {
+        type: Array,
+        default: []
     }
 }));
 

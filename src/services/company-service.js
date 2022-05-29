@@ -3,6 +3,8 @@ const router = express.Router();
 const randomstring = require('randomstring');
 const sessionstorage = require('sessionstorage');
 const company = require('../models/company');
+const hashPassword = require('../tools/hash');
+const jwt = require('jsonwebtoken');
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID
 const authToken = process.env.TWILIO_ACCOUNT_AUTHKEY
@@ -69,7 +71,7 @@ router.post('/sendOtp', async (req, res) => {
 
 router.post('/signup', async (req, res) => {
     try {
-        const {phone, companyName, typeOfBusiness, employeeName, address, otp} = req.body;
+        const {phone, companyName, typeOfBusiness, employeeName, otp, password} = req.body;
         const sessionOtp = sessionstorage.getItem(phone);
         if (otp!=sessionOtp) {
             return res.send(401).json({sucess: false, message: 'Invalid OTP'});
@@ -80,18 +82,44 @@ router.post('/signup', async (req, res) => {
             return res.status(403).json({success: false, message: 'Same number exists in DB'});
         }
 
+        const hashedPass = await hashPassword(password);
+
         let newOrg = new company({
             phone,
             companyName,
             typeOfBusiness,
             employeeName,
-            address
+            address,
+            password: hashPassword
         });
 
         newOrg = await newOrg.save();
-        //add contract call
         return res.status(200).json({success: true, message: 'Org Created'});
 
+    } catch (e) {
+        return res.status(500).json({success: false, message: 'Some error occurred'});
+    }
+});
+
+router.post('/login', (req, res) => {
+    try {
+        const {phone, password} = req.body;
+        const user = await company.findOne({phone});
+        if (!user) {
+            return res.status(401).json({ success: false, error: "Invalid credentials" });
+        }
+    
+        let check = await bcrypt.compare(password, user.password);
+        if (check) {
+            const secret = process.env.JWT_SECRET;
+            let id = user._id;
+            const token = jwt.sign({id: id}, secret, {
+                expiresIn: "30d"
+            });
+            return res.status(200).json({ success: true, token: token });
+        }
+    
+        return res.status(401).json({ success: false, error: "Invalid credentials" });
     } catch (e) {
         return res.status(500).json({success: false, message: 'Some error occurred'});
     }
