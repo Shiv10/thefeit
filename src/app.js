@@ -4,6 +4,8 @@ const express = require("express");
 const rateLimiter = require('express-rate-limit');
 const bodyParser = require('body-parser')
 const cors = require('cors');
+const comapanyService = require('./services/company-service');
+const clientService = require('./services/client-service');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,7 +26,8 @@ app.use(cors({
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-
+app.use('/org', comapanyService);
+app.use('/user', clientService);
 app.get("/", (req, res) => {
 	res.send("test");
 });

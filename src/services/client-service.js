@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const randomstring = require('randomstring');
 const sessionstorage = require('sessionstorage');
-const company = require('../models/company');
+const user = require('../models/user');
 const hashPassword = require('../tools/hash');
 const jwt = require('jsonwebtoken');
 
@@ -20,8 +20,8 @@ const formatMessage = (template, otp) => {
 router.post('/sendOtp', async (req, res) => {
     try {
         const {phone, countryCode = '+91'} = req.body;
-        const employeeInstance = await company.findOne({ phone });
-        if (employeeInstance) {
+        const userInstance = await user.findOne({ phone });
+        if (userInstance) {
             return res.status(403).json({success: false, message: 'Same number exists in DB'});
         }
         const mobileNumber = `${countryCode}${phone}`
@@ -71,30 +71,27 @@ router.post('/sendOtp', async (req, res) => {
 
 router.post('/signup', async (req, res) => {
     try {
-        const {phone, companyName, typeOfBusiness, employeeName, otp, password} = req.body;
+        const {phone, name, otp, password} = req.body;
         const sessionOtp = sessionstorage.getItem(phone);
         if (otp!=sessionOtp) {
             return res.send(401).json({sucess: false, message: 'Invalid OTP'});
         }
 
-        const employeeInstance = await company.findOne({ phone });
-        if (employeeInstance) {
+        const userInstance = await user.findOne({ phone });
+        if (userInstance) {
             return res.status(403).json({success: false, message: 'Same number exists in DB'});
         }
 
         const hashedPass = await hashPassword(password);
 
-        let newOrg = new company({
+        let newUser = new user({
             phone,
-            companyName,
-            typeOfBusiness,
-            employeeName,
-            address,
+            name,
             password: hashPassword
         });
 
-        newOrg = await newOrg.save();
-        return res.status(200).json({success: true, message: 'Org Created'});
+        newUser = await newUser.save();
+        return res.status(200).json({success: true, message: 'User Created'});
 
     } catch (e) {
         return res.status(500).json({success: false, message: 'Some error occurred'});
@@ -104,7 +101,7 @@ router.post('/signup', async (req, res) => {
 router.post('/login', (req, res) => {
     try {
         const {phone, password} = req.body;
-        const user = await company.findOne({phone});
+        const user = await user.findOne({phone});
         if (!user) {
             return res.status(401).json({ success: false, error: "Invalid credentials" });
         }
