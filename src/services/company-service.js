@@ -144,4 +144,18 @@ router.post('/addProduct',authorize, async (req, res) => {
     }
 });
 
+router.post('/getProducts', authorize, async (req, res) => {
+    const { phone } = req.body;
+    try {
+        const currUser = await company.findOne({phone});
+        if (currUser) {
+            return res.status(200).json({sucess: true, message: currUser.products});
+        }
+        return res.status(200).json({success: false, message: 'No company found'});
+    } catch (e) {
+        console.log(e);
+        return res.status(500).json({success: false, message: 'Internal server error '});
+    }
+});
+
 module.exports = router;
