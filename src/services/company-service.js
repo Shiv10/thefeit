@@ -3,7 +3,8 @@ const router = express.Router();
 const randomstring = require('randomstring');
 const sessionstorage = require('sessionstorage');
 const company = require('../models/company');
-const hashPassword = require('../tools/hash');
+const hashPassword = require('../utils/hash');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const authorize = require('../middlewares/auth');
 
@@ -46,7 +47,7 @@ router.post('/sendOtp', async (req, res) => {
                 to: mobileNumber
             });
             console.log(msg.sid);
-            return res.send(200).json({success: true, message: `OTP retries remaining: ${3-currentOtpRetries}`});
+            return res.status(200).json({success: true, message: `OTP retries remaining: ${3-currentOtpRetries}`});
         }
 
         const otp = randomstring.generate({
@@ -63,7 +64,7 @@ router.post('/sendOtp', async (req, res) => {
             to: mobileNumber
         });
         console.log(msg.sid);
-        return res.send(200).json({success: true, message: 'OTP sent'});
+        return res.status(200).json({success: true, message: 'OTP sent'});
 
     } catch (e) {
         return res.status(500).json({success: false, message: 'Internal server error '});
@@ -74,8 +75,10 @@ router.post('/signup', async (req, res) => {
     try {
         const {phone, companyName, typeOfBusiness, employeeName, otp, password} = req.body;
         const sessionOtp = sessionstorage.getItem(phone);
+        console.log(sessionOtp);
+        console.log(otp);
         if (otp!=sessionOtp) {
-            return res.send(401).json({sucess: false, message: 'Invalid OTP'});
+            return res.status(401).json({sucess: false, message: 'Invalid OTP'});
         }
 
         const employeeInstance = await company.findOne({ phone });
@@ -90,14 +93,14 @@ router.post('/signup', async (req, res) => {
             companyName,
             typeOfBusiness,
             employeeName,
-            address,
-            password: hashPassword
+            password: hashedPass
         });
 
         newOrg = await newOrg.save();
         return res.status(200).json({success: true, message: 'Org Created'});
 
     } catch (e) {
+        console.log(e);
         return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
@@ -122,17 +125,17 @@ router.post('/login', async (req, res) => {
     
         return res.status(401).json({ success: false, error: "Invalid credentials" });
     } catch (e) {
+        console.log(e);
         return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
 
 router.post('/addProduct',authorize, async (req, res) => {
     const {product, phone} = req.body;
-    const org = await company.find({phone: phone});
-
+    const org = await company.findOne({phone: phone});
     let products = org.products;
     products.push(product);
-    org.products = products;
+    // org.products = products;
     try {
         await org.save();
         return res.status(200).json({ success: true, message: 'Saved successfully' });

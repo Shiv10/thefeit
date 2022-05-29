@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const user = mongoose.model('company', new mongoose.Schema({
+const user = mongoose.model('user', new mongoose.Schema({
     phone: {
         type: Number,
         required: true,

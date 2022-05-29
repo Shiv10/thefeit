@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const randomstring = require('randomstring');
 const sessionstorage = require('sessionstorage');
+const bcrypt = require('bcrypt');
 const user = require('../models/user');
-const hashPassword = require('../tools/hash');
+const hashPassword = require('../utils/hash');
 const jwt = require('jsonwebtoken');
 const {
 	AccountId,
@@ -64,7 +65,7 @@ router.post('/sendOtp', async (req, res) => {
                 to: mobileNumber
             });
             console.log(msg.sid);
-            return res.send(200).json({success: true, message: `OTP retries remaining: ${3-currentOtpRetries}`});
+            return res.status(200).json({success: true, message: `OTP retries remaining: ${3-currentOtpRetries}`});
         }
 
         const otp = randomstring.generate({
@@ -81,9 +82,10 @@ router.post('/sendOtp', async (req, res) => {
             to: mobileNumber
         });
         console.log(msg.sid);
-        return res.send(200).json({success: true, message: 'OTP sent'});
+        return res.status(200).json({success: true, message: 'OTP sent'});
 
     } catch (e) {
+        console.log(e);
         return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
@@ -93,7 +95,7 @@ router.post('/signup', async (req, res) => {
         const {phone, name, otp, password} = req.body;
         const sessionOtp = sessionstorage.getItem(phone);
         if (otp!=sessionOtp) {
-            return res.send(401).json({sucess: false, message: 'Invalid OTP'});
+            return res.status(401).json({sucess: false, message: 'Invalid OTP'});
         }
 
         const userInstance = await user.findOne({ phone });
@@ -106,7 +108,7 @@ router.post('/signup', async (req, res) => {
         let newUser = new user({
             phone,
             name,
-            password: hashPassword
+            password: hashedPass
         });
 
         newUser = await newUser.save();
@@ -120,15 +122,15 @@ router.post('/signup', async (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const {phone, password} = req.body;
-        const user = await user.findOne({phone});
-        if (!user) {
+        const users = await user.findOne({phone});
+        if (!users) {
             return res.status(401).json({ success: false, error: "Invalid credentials" });
         }
     
-        let check = await bcrypt.compare(password, user.password);
+        let check = await bcrypt.compare(password, users.password);
         if (check) {
             const secret = process.env.JWT_SECRET;
-            let id = user._id;
+            let id = users._id;
             const token = jwt.sign({id: id}, secret, {
                 expiresIn: "30d"
             });
@@ -137,6 +139,7 @@ router.post('/login', async (req, res) => {
     
         return res.status(401).json({ success: false, error: "Invalid credentials" });
     } catch (e) {
+        console.log(e);
         return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
@@ -144,7 +147,7 @@ router.post('/login', async (req, res) => {
 router.post('/registerProduct', authorize, async (req, res) => {
     try {
 
-        const {serialNumber, phone} = req.body;
+        let {serialNumber, phone} = req.body;
         phone = parseInt(phone);
         serialNumber = parseInt(serialNumber);
     
@@ -152,7 +155,7 @@ router.post('/registerProduct', authorize, async (req, res) => {
             .setContractId(contractId)
             .setGas(100000)
             .setFunction("getProduct", new ContractFunctionParameters().addUint256(serialNumber));
-        const contractQuerySubmit = await contractQueryTx.execute(client);
+        const contractQuerySubmit = await contractQueryTx.execute(hederaClient);
         const contractQueryResult = contractQuerySubmit.getUint256(0);
         
         if(contractQueryResult.toString().length==10) {
@@ -164,13 +167,17 @@ router.post('/registerProduct', authorize, async (req, res) => {
             .setGas(100000)
             .setFunction("setProduct", new ContractFunctionParameters().addUint256(serialNumber).addUint256(phone));
     
-        const contractExecuteSubmit = await contractExecuteTx.execute(client);
-        const contractExecuteRx = await contractExecuteSubmit.getReceipt(client);
-        if(contractExecuteRx.status =='SUCCESS') {
-            return res.status(200).json({success: true, message: 'Product registered successfully.'})
+        const contractExecuteSubmit = await contractExecuteTx.execute(hederaClient);
+        const contractExecuteRx = await contractExecuteSubmit.getReceipt(hederaClient);
+        let currUser = await user.findOne({phone});
+        if (currUser) {
+            currUser.products.push(serialNumber);
         }
-        return res.status(500).json({success: false, message: 'Internal server error '});
+        currUser = await currUser.save();
+        return res.status(200).json({success: true, message: 'Product registered successfully.'})
+    
     } catch (e) {
+        console.log(e);
         return res.status(500).json({success: false, message: 'Internal server error '});
     }
 });
